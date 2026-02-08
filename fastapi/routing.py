@@ -997,6 +997,70 @@ class APIRouter(routing.Router):
         self.default_response_class = default_response_class
         self.generate_unique_id_function = generate_unique_id_function
 
+    def mount(
+        self,
+        path: Annotated[
+            str,
+            Doc(
+                """
+                The path where the sub-application will be mounted.
+
+                This will be prefixed with the router's `prefix` if one was set.
+                """
+            ),
+        ],
+        app: Annotated[
+            ASGIApp,
+            Doc(
+                """
+                The ASGI application to mount (e.g. a `FastAPI` instance, a
+                `StaticFiles` instance, etc.).
+                """
+            ),
+        ],
+        name: Annotated[
+            Optional[str],
+            Doc(
+                """
+                An optional name for the mount. This can be used to generate
+                URLs to the mounted application.
+                """
+            ),
+        ] = None,
+    ) -> None:
+        """
+        Mount a sub-application at the given path.
+
+        This works just like `FastAPI.mount()`, but will respect the router's
+        `prefix` if one was set.
+
+        Read more about it in the
+        [FastAPI docs for Sub Applications](https://fastapi.tiangolo.com/advanced/sub-applications/).
+
+        ## Example
+
+        ```python
+        from fastapi import APIRouter, FastAPI
+
+        app = FastAPI()
+        api_router = APIRouter(prefix="/api")
+
+        subapi = FastAPI()
+
+        @subapi.get("/sub")
+        def read_sub():
+            return {"message": "Hello from sub API"}
+
+        api_router.mount("/v1", subapi)
+        app.include_router(api_router)
+        # Now the sub-application is available at /api/v1/sub
+        ```
+        """
+        # Apply the router's prefix to the mount path
+        prefixed_path = self.prefix + path
+        # Call the parent class's mount method with the prefixed path
+        super().mount(path=prefixed_path, app=app, name=name)
+
     def route(
         self,
         path: str,
@@ -1491,6 +1555,12 @@ class APIRouter(routing.Router):
             elif isinstance(route, routing.WebSocketRoute):
                 self.add_websocket_route(
                     prefix + route.path, route.endpoint, name=route.name
+                )
+            elif isinstance(route, Mount):
+                self.mount(
+                    path=prefix + route.path,
+                    app=route.app,
+                    name=route.name,
                 )
         for handler in router.on_startup:
             self.add_event_handler("startup", handler)
