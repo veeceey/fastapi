@@ -243,6 +243,8 @@ def get_openapi_operation_metadata(
     if route.description:
         operation["description"] = route.description
     operation_id = route.operation_id or route.unique_id
+    if len(route.methods) > 1 and not route.operation_id:
+        operation_id = f"{operation_id}_{method.lower()}"
     if operation_id in operation_ids:
         message = (
             f"Duplicate Operation ID {operation_id} for function "
